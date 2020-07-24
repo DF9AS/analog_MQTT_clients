@@ -16,7 +16,7 @@ short voltage_measured;
 short current_measured;
 
 // Address of MCP4725 board
-MCP4725 DAC(0x62); //0x62 or 0x63
+MCP4725 DAC(0x60); //0x60 default address
 
 // MQTT Network Parameters
 // Set your MAC address and IP address here
@@ -41,16 +41,21 @@ void setup()
   Serial.begin(9600);
   
   // Start the ethernet connection
-  Ethernet.begin(mac);              
-  
+  if (Ethernet.begin(mac) == 0) {
+    Serial.println("Failed to configure Ethernet using DHCP"); 
+  }
+  else {
+  Serial.println(Ethernet.localIP());
+  }
   // Ethernet takes some time to boot!
   delay(3000);                          
  
+  
   // Set the MQTT server to the server stated above ^
   mqttClient.setServer(server_ip, 1883);   
  
   // Attempt to connect to the server with the ID "myClientID"
-  if (mqttClient.connect("myClientID")) 
+  if (mqttClient.connect("LoadLock")) 
   {
     Serial.println("Connection has been established, well done");
  
@@ -62,20 +67,12 @@ void setup()
     Serial.println("Looks like the server connection failed...");
   }
 
-  DAC.begin();
-  DAC.setValue(0);
+  //DAC.begin();
+  //DAC.setValue(0);
 
   // Set A0 and A1 as Inputs
   pinMode(A0, INPUT);
   pinMode(A1, INPUT);
-
-  // Set A2 and A3 as Outputs to make them our GND and Vcc,
-  //which will power the MCP4725
-  pinMode(A2, OUTPUT);
-  pinMode(A3, OUTPUT);
-
-  digitalWrite(A2, LOW);//Set A2 as GND
-  digitalWrite(A3, HIGH);//Set A3 as Vcc
 }
 
 void loop()
