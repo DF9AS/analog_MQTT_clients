@@ -5,12 +5,12 @@
 #include <PubSubClient.h> // MQTT Publish nur mit QoS 0 möglich (Speicher ist zu knapp)
 
 // Delta Electronica properties
-unsigned int voltage_max = 30;
-unsigned int current_max = 5;
+char voltage_max = 30;
+char current_max = 5;
 
 // Variables for Analog Inputs connected to Delta Electronica monitor output
-short voltage_sensor;
-short current_sensor;
+float voltage_sensor;
+float current_sensor;
 
 //Variables for Analog Outputs
 short voltage_output;
@@ -73,7 +73,7 @@ void setup()
 
   dac.begin();
   dac.setValue(0);
-  
+
    // If control is needed
   mqttClient.subscribe(topic_current_subscribe, 1);
   mqttClient.subscribe(topic_voltage_subscribe, 1);
@@ -86,10 +86,11 @@ void loop()
   mqttClient.loop();
 
   // Attempt to publish a value to the topic "topic_*_publish"
-  voltage_sensor = analogRead(A0) * (voltage_max / 1023.0);
+  voltage_sensor = analogRead(0) * (voltage_max / 1023.0);
   dtostrf(voltage_sensor, 6,2, voltage_sensor_str);
-  current_sensor = analogRead(A1) * (current_max / 1023.0);
+  current_sensor = analogRead(1) * (current_max / 1023.0);
    dtostrf(current_sensor, 6,2, current_sensor_str);
+
 
   if (mqttClient.publish(topic_current_publish, current_sensor_str))
   {
