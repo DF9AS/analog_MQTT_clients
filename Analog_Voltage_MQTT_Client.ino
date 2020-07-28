@@ -75,7 +75,7 @@ void loop()
 
   current_sensor = analogRead(1) * (current_max / 1023.0);
    dtostrf(current_sensor, 6,2, current_sensor_str);
-  mqttClient.publish(topic_current_publish, current_sensor_str));
+  mqttClient.publish(topic_current_publish, current_sensor_str);
 
   // Approx. Sending Intervall
   delay(1000);

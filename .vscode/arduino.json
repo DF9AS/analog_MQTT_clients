@@ -1,6 +1,6 @@
 {
     "port": "/dev/ttyUSB0",
     "board": "arduino:avr:uno",
-    "sketch": "DeltaElectronica_MQTT_client.ino",
+    "sketch": "Analog_Voltage_MQTT_Client.ino",
     "programmer": "ArduinoISP"
 }
