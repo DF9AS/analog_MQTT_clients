@@ -40,18 +40,9 @@ PubSubClient mqttClient(ethClient);
 
 void setup()
 {
-  // Useful for debugging purposes
-  Serial.begin(9600);
-
   // Start the ethernet connection
-  if (Ethernet.begin(mac) == 0)
-  {
-    Serial.println("Failed to configure Ethernet using DHCP");
-  }
-  else
-  {
-    Serial.println(Ethernet.localIP());
-  }
+  Ethernet.begin(mac);
+
   // Ethernet takes some time to boot!
   delay(3000);
 
@@ -59,18 +50,10 @@ void setup()
   mqttClient.setServer(server_ip, 1883);
 
   // Attempt to connect to the server with the ID "myClientID"
-  if (mqttClient.connect("LoadLock"))
-  {
-    Serial.println("Connection has been established, well done");
+  mqttClient.connect("LoadLockClient");
+  mqttClient.setCallback(subscribeReceive);
 
-    // Establish the subscribe event
-    mqttClient.setCallback(subscribeReceive);
-  }
-  else
-  {
-    Serial.println("Looks like the server connection failed...");
-  }
-
+  // Initialize DAC
   dac.begin();
   dac.setValue(0);
 
@@ -85,25 +68,17 @@ void loop()
   // This is needed at the top of the loop!
   mqttClient.loop();
 
-  // Attempt to publish a value to the topic "topic_*_publish"
+  // Attempt to publish a value to the topics
   voltage_sensor = analogRead(0) * (voltage_max / 1023.0);
   dtostrf(voltage_sensor, 6,2, voltage_sensor_str);
-  current_sensor = analogRead(1) * (current_max / 1023.0);
-   dtostrf(current_sensor, 6,2, current_sensor_str);
-
-
-  if (mqttClient.publish(topic_current_publish, current_sensor_str))
-  {
-    Serial.println("Publish message success");
-  }
-  else
-  {
-    Serial.println("Could not send message :(");
-  }
   mqttClient.publish(topic_voltage_publish, voltage_sensor_str);
 
-  // Dont overload the server!
-  delay(4000);
+  current_sensor = analogRead(1) * (current_max / 1023.0);
+   dtostrf(current_sensor, 6,2, current_sensor_str);
+  mqttClient.publish(topic_current_publish, current_sensor_str));
+
+  // Approx. Sending Intervall
+  delay(1000);
 }
 
 void subscribeReceive(char *topic, byte *payload, unsigned int length)
@@ -112,25 +87,13 @@ void subscribeReceive(char *topic, byte *payload, unsigned int length)
   for (int i=0;i<length;i++) {
     str_message += ((char)payload[i]);
   }
-  // Print the topic
-  Serial.print("Topic: ");
-  Serial.println(topic);
 
   if (strcmp(topic, topic_current_subscribe) == 0) {
     current_output = (int)(str_message.toFloat() * (4095.0 / current_max));
-    Serial.println(current_output);
     dac.setValue(current_output);
   }
   else if (strcmp(topic,topic_voltage_subscribe)==0) {
     voltage_output = (int)(str_message.toFloat() * (4095.0 / voltage_max));
-    //dac.setValue(current_output)
-    Serial.println("Voltage Output not configured");
+    //dac.setValue(voltage_output)
   }
-  else {
-    // Print the message
-    Serial.print("Message: ");
-    Serial.println(str_message);
-
-    }
-  }
-
+}
