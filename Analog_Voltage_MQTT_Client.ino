@@ -5,8 +5,8 @@
 #include <PubSubClient.h> // MQTT Publish nur mit QoS 0 möglich (Speicher ist zu knapp)
 
 // Delta Electronica properties
-char voltage_max = 30;
-char current_max = 5;
+const char voltage_max = 30;
+const char current_max = 5;
 
 // Variables for Analog Inputs connected to Delta Electronica monitor output
 float voltage_sensor;
@@ -24,15 +24,15 @@ MCP4725 dac(0x60); //0x60 default address
 
 // MQTT Network Parameters
 // Set your MAC address and IP address here
-byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
-IPAddress ip(10, 42, 0, 10); // DHCP possible, but expensive
-IPAddress server_ip(192, 168, 2, 161);
+const byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
+const IPAddress ip(10, 42, 0, 10); // DHCP possible, but expensive
+const IPAddress server_ip(192, 168, 2, 161);
 
 // Set MQTT Topic to publish and subscribe
-char topic_current_publish[] = "mbe/load-lock-lamp/current/update";
-char topic_voltage_publish[] = "mbe/load-lock-lamp/voltage/update";
-char topic_current_subscribe[] = "mbe/load-lock-lamp/current/targetstate";
-char topic_voltage_subscribe[] = "mbe/load-lock-lamp/voltage/targetstate";
+const char topic_current_publish[] = "mbe/load-lock-lamp/current/update";
+const char topic_voltage_publish[] = "mbe/load-lock-lamp/voltage/update";
+const char topic_current_subscribe[] = "mbe/load-lock-lamp/current/targetstate";
+const char topic_voltage_subscribe[] = "mbe/load-lock-lamp/voltage/targetstate";
 
 // Ethernet and MQTT related objects
 EthernetClient ethClient;
