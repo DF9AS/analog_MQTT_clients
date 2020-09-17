@@ -3,6 +3,8 @@
         {
             "name": "Linux",
             "includePath": [
+                "/home/schuck/Arduino/libraries/ADS1115_WE/src",
+                "/home/schuck/Arduino/libraries/ArduinoJson/src",
                 "/home/schuck/Arduino/libraries/MCP4725",
                 "/home/schuck/Arduino/libraries/Adafruit_MCP4725",
                 "/home/schuck/Arduino/libraries/Ethernet/src",

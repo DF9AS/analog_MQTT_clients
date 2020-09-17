@@ -1,99 +1,130 @@
+
+#include <Ethernet.h>
 #include <MCP4725.h>
 #include <Wire.h>
 #include <SPI.h>
-#include <Ethernet.h>
 #include <PubSubClient.h> // MQTT Publish nur mit QoS 0 möglich (Speicher ist zu knapp)
+#include <ADS1115_WE.h>
+#include <ArduinoJson.h>
+
+
+const bool DAC_ENABLED = true;
 
 // Delta Electronica properties
-const char voltage_max = 30;
-const char current_max = 5;
-
-// Variables for Analog Inputs connected to Delta Electronica monitor output
-float voltage_sensor;
-float current_sensor;
+const char voltage_max = 70;
+const char voltage_max_measure = 5;
+const char current_max = 20;
+const char current_max_measure = 5;
 
 //Variables for Analog Outputs
 short voltage_output;
 short current_output;
 
-char voltage_sensor_str[8];
-char current_sensor_str[8];
-
-// Address of MCP4725 board
-MCP4725 dac(0x60); //0x60 default address
-
 // MQTT Network Parameters
 // Set your MAC address and IP address here
-const byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
-const IPAddress ip(10, 42, 0, 10); // DHCP possible, but expensive
+byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
+const IPAddress ip(192, 168, 2, 230); // DHCP possible, but expensive
 const IPAddress server_ip(192, 168, 2, 161);
 
 // Set MQTT Topic to publish and subscribe
-const char topic_current_publish[] = "mbe/load-lock-lamp/current/update";
-const char topic_voltage_publish[] = "mbe/load-lock-lamp/voltage/update";
-const char topic_current_subscribe[] = "mbe/load-lock-lamp/current/targetstate";
-const char topic_voltage_subscribe[] = "mbe/load-lock-lamp/voltage/targetstate";
+const char topic_publish[] = "mbe/loadlock-lamp/update";
+const char topic_subscribe[] = "mbe/loadlock-lamp/targetstate";
+const char topic[] = "mbe/loadlock-lamp";
+
 
 // Ethernet and MQTT related objects
 EthernetClient ethClient;
-PubSubClient mqttClient(ethClient);
+PubSubClient mqttClient;
+
+// 188uV/bit
+ADS1115_WE adc(0x48);
+
 
 void setup()
 {
+  Wire.begin();
+  Serial.begin(9600);
+  Serial.println("Connecting...");
   // Start the ethernet connection
   Ethernet.begin(mac);
 
   // Ethernet takes some time to boot!
   delay(3000);
+  
+  Serial.println("Ethernet connected");
+
+  if(!adc.init()){
+    Serial.println("ADS1115 not connected!");
+  }
 
   // Set the MQTT server to the server stated above ^
+  mqttClient.setClient(ethClient);
   mqttClient.setServer(server_ip, 1883);
 
+  Serial.println("MQTT Server connected");
+
   // Attempt to connect to the server with the ID "myClientID"
-  mqttClient.connect("LoadLockClient");
+  mqttClient.connect("sputter-sample");
   mqttClient.setCallback(subscribeReceive);
 
-  // Initialize DAC
-  dac.begin();
-  dac.setValue(0);
+  if (DAC_ENABLED) {
+    mqttClient.subscribe(topic_subscribe, 1);
+    Serial.println("MQTT topic subscribed");
 
-   // If control is needed
-  mqttClient.subscribe(topic_current_subscribe, 1);
-  mqttClient.subscribe(topic_voltage_subscribe, 1);
-
+    // Address of MCP4725 board
+    MCP4725 dac(0x60); //0x60 default address
+    // Initialize DAC
+    dac.begin();
+    dac.setValue(0);
+    Serial.println("DAC Initialized");
+  }
 }
 
 void loop()
 {
   // This is needed at the top of the loop!
   mqttClient.loop();
+  Ethernet.maintain(); 
+  float voltage_sensor = 0.0;
+  float current_sensor = 0.0;
+  float voltage_measured;
+  float current_measured;
+  char buffer[256];
 
+  //JSON properties
+  const int capacity = JSON_OBJECT_SIZE(3);
+  StaticJsonDocument<capacity> doc;
+
+  Serial.println("Start Measurement");
   // Attempt to publish a value to the topics
-  voltage_sensor = analogRead(0) * (voltage_max / 1023.0);
-  dtostrf(voltage_sensor, 6,2, voltage_sensor_str);
-  mqttClient.publish(topic_voltage_publish, voltage_sensor_str);
+  adc.setVoltageRange_mV(ADS1115_RANGE_6144);
+  adc.setCompareChannels(ADS1115_COMP_0_GND);
+  adc.startSingleMeasurement();
+  while(adc.isBusy()){}
+  voltage_sensor = adc.getResult_V();
 
-  current_sensor = analogRead(1) * (current_max / 1023.0);
-   dtostrf(current_sensor, 6,2, current_sensor_str);
-  mqttClient.publish(topic_current_publish, current_sensor_str);
+  adc.setCompareChannels(ADS1115_COMP_1_GND);
+  adc.startSingleMeasurement();
+  current_sensor = adc.getResult_V();
+  while(adc.isBusy()){}
+  current_sensor = adc.getResult_V();
+  Serial.println("Finished Measurement");
+
+  doc["topic"] = topic;
+  doc["voltage"] = voltage_sensor / voltage_max_measure * voltage_max;
+  doc["current"] = current_sensor / current_max_measure * current_max;
+
+  serializeJsonPretty(doc, buffer);
+  mqttClient.publish(topic_publish, buffer);
+  Serial.println(buffer);
 
   // Approx. Sending Intervall
   delay(1000);
 }
 
-void subscribeReceive(char *topic, byte *payload, unsigned int length)
+void subscribeReceive(char* topic, byte* payload, unsigned int length)
 {
-  String str_message = "";
-  for (int i=0;i<length;i++) {
-    str_message += ((char)payload[i]);
-  }
-
-  if (strcmp(topic, topic_current_subscribe) == 0) {
-    current_output = (int)(str_message.toFloat() * (4095.0 / current_max));
-    dac.setValue(current_output);
-  }
-  else if (strcmp(topic,topic_voltage_subscribe)==0) {
-    voltage_output = (int)(str_message.toFloat() * (4095.0 / voltage_max));
-    //dac.setValue(voltage_output)
-  }
+  const int capacity = JSON_OBJECT_SIZE(3);
+  StaticJsonDocument<capacity> doc;
+  deserializeJson(doc, payload, length);
 }
